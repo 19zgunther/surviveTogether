@@ -35,7 +35,6 @@ class Player
         this.healthRegenPerSecond = 0.25;
 
 
-
         this.position = position;
         this.rotation = new vec4();
         this.scale = new vec4(1,1,1);
@@ -1154,7 +1153,7 @@ function update()
 
 
 // Create a WebSocket client instance
-const ws = new WebSocket('ws://localhost:8080');
+const ws = new WebSocket('ws://35.153.49.211:8080');
 
 // Event listener for when the connection is established
 ws.addEventListener('open', () => {
