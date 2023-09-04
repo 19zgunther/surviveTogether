@@ -1243,6 +1243,50 @@ function pointInsideBoundingCylinder(point=new vec4(), cylinderCenter=new vec4()
 }
 
 
+class Asset
+{
+    constructor(
+        name="default_name",
+        type="tool", // Or item, or ...?
+        modelText="",
+        spawn={weight:1, biome:'any'},
+        health={amount:1, type:'any'}, //type can be any, chopDamage, mineDamage, attackDamage
+        drop=[{assetName:'wood',count:1}], 
+        recipe=[{assetName:'wood',count:1}],
+        grow={time:100,next:''},
+        damage = {attackDamage:0, chopDamage:0, mineDamage:0, range:0.5, cooldown_ms:200},
+        isCollectable = false,
+        isTool = false,
+    )
+    {
+        this.name = name;
+        this.type = type;
+        this.modelText = modelText;
+        this.spawn = spawn;
+        this.health = health;
+        this.drop = drop;
+        this.recipe = recipe;
+        this.grow = grow;
+        this.damage = damage
+        this.isCollectable = isCollectable;
+        this.isTool = isTool;
+
+
+        const meshData = parseOBJ(this.modelText);
+        this.vertices = meshData.vertices;
+        this.indices = meshData.indices;
+        this.normals = meshData.normals;
+        this.colors = meshData.colors;
+        this.boundingBox = computeBoundingBox('box', this.vertices);
+        this.boundingCylinder = computeBoundingCylinder(this.vertices);
+        this.boundingCylinderRadius = this.boundingCylinder.radius;
+        this.boundingCylinderCenter = this.boundingCylinder.center;
+        this.boundingCylinderHeight = this.boundingCylinder.height;
+    }
+}
+
+// Define all assets objects, assets[] and assetsMap {}
+{
 // Define all asset objects
 var wood = `
 # Color definition for Tinkercad Obj File 2015
@@ -17947,53 +17991,6 @@ f 36 	51 	34
 # 40 faces
 #end of obj_0
 `;
-
-
-class Asset
-{
-    constructor(
-        name="default_name",
-        type="tool", // Or item, or ...?
-        modelText="",
-        spawn={weight:1, biome:'any'},
-        health={amount:1, type:'any'}, //type can be any, chopDamage, mineDamage, attackDamage
-        drop=[{assetName:'wood',count:1}], 
-        recipe=[{assetName:'wood',count:1}],
-        grow={time:100,next:''},
-        damage = {attackDamage:0, chopDamage:0, mineDamage:0, range:0.5, cooldown_ms:200},
-        isCollectable = false,
-        isTool = false,
-    )
-    {
-        this.name = name;
-        this.type = type;
-        this.modelText = modelText;
-        this.spawn = spawn;
-        this.health = health;
-        this.drop = drop;
-        this.recipe = recipe;
-        this.grow = grow;
-        this.damage = damage
-        this.isCollectable = isCollectable;
-        this.isTool = isTool;
-
-
-        const meshData = parseOBJ(this.modelText);
-        this.vertices = meshData.vertices;
-        this.indices = meshData.indices;
-        this.normals = meshData.normals;
-        this.colors = meshData.colors;
-        this.boundingBox = computeBoundingBox('box', this.vertices);
-        this.boundingCylinder = computeBoundingCylinder(this.vertices);
-        this.boundingCylinderRadius = this.boundingCylinder.radius;
-        this.boundingCylinderCenter = this.boundingCylinder.center;
-        this.boundingCylinderHeight = this.boundingCylinder.height;
-    }
-}
-
-// Define all assets objects, assets[] and assetsMap {}
-{
-
 var asset_wood = new Asset(
     'wood', 'item', wood, null, null, null, null, null, null, true
 );
@@ -18028,7 +18025,7 @@ var asset_firTree3 = new Asset(
     "firTree3", 'item', firTree3, {weight:1, biome:'forest'}, {amount:8, type:'chopDamage'}, [{assetName:'wood',count:4}], null, {time:50, next:'firTree4'}, null,
 );
 var asset_firTree4 = new Asset(
-    "firTree4", 'item', firTree4, {weight:1, biome:'forest'}, {amount:10, type:'chopDamage'}, [{assetName:'wood',count:8}], null, null, null
+    "firTree4", 'item', firTree4, {weight:1, biome:'forest'}, {amount:10, type:'chopDamage'}, [{assetName:'wood',count:6},{assetName:'firTree1',count:2}], null, null, null
 );
 
 var asset_mapleTree1 = new Asset(
@@ -18041,7 +18038,7 @@ var asset_mapleTree3 = new Asset(
     "mapleTree3", 'item', mapleTree3, {weight:1, biome:'forest'}, {amount:8, type:'chopDamage'}, [{assetName:'wood',count:4}], null, {time:100, next:'mapleTree4'}, null,
 );
 var asset_mapleTree4 = new Asset(
-    "mapleTree4", 'item', mapleTree4, {weight:1, biome:'forest'}, {amount:10, type:'chopDamage'}, [{assetName:'wood',count:8}], null, null, null,
+    "mapleTree4", 'item', mapleTree4, {weight:1, biome:'forest'}, {amount:10, type:'chopDamage'}, [{assetName:'wood',count:6},{assetName:'mapleTree1',count:2}], null, null, null,
 );
 
 
@@ -18672,9 +18669,9 @@ function parse_stc_givePlayerEntity(message)
         entityName: arr[2],
     }
 }
-function stc_instantiateEntity(assetName,assetID,position,rotation)
+function stc_instantiateEntity(assetName,assetID,position,rotation,isCollectable)
 {
-    return `stc_instantiateEntity,${assetName},${assetID},${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)},${rotation.x.toFixed(2)},${rotation.y.toFixed(2)},${rotation.z.toFixed(2)}@`
+    return `stc_instantiateEntity,${assetName},${assetID},${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)},${rotation.x.toFixed(2)},${rotation.y.toFixed(2)},${rotation.z.toFixed(2)},${isCollectable},@`
 }
 function parse_stc_instantiateEntity(message = "")
 {
@@ -18684,6 +18681,7 @@ function parse_stc_instantiateEntity(message = "")
         entityID: arr[2],
         position:new vec4(Number(arr[3]),Number(arr[4]),Number(arr[5])),
         rotation:new vec4(Number(arr[6]),Number(arr[7]),Number(arr[8])),
+        isCollectable: (arr[9] == 'true') ? true : false
     }
 }
 function stc_setEntityPositionRotation(entityID, position, rotation, velocity=-1)
@@ -18719,7 +18717,7 @@ function stc_entityData(entity)
     const p = entity.position;
     const r = entity.rotation;
 
-    return `stc_entityData,${entity.asset.name},${entity.id},${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)},${r.x.toFixed(2)},${r.y.toFixed(2)},${r.z.toFixed(2)},${entity.health}@`;
+    return `stc_entityData,${entity.asset.name},${entity.id},${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)},${r.x.toFixed(2)},${r.y.toFixed(2)},${r.z.toFixed(2)},${entity.health},${entity.isCollectable}@`;
 }
 function parse_stc_entityData(message = "")
 {
@@ -18729,7 +18727,9 @@ function parse_stc_entityData(message = "")
         entityID:arr[2],
         position:new vec4(Number(arr[3]),Number(arr[4]),Number(arr[5])),
         rotation:new vec4(Number(arr[6]),Number(arr[7]),Number(arr[8])),
-        arrivalTimestamp_ms:Number(arr[9])
+        health: Number(arr[9]),
+        isCollectable: (arr[10] == 'true') ? true : false,
+        arrivalTimestamp_ms: Date.now()
     }
 }
 function cts_playerData(player)
@@ -18801,7 +18801,7 @@ if (typeof window == "undefined")
     const entities = [];//generate_world(200);
     const entitiesMap = new Map();
     const playerMap = new Map();
-    const playerEntitySendDistance = 50;
+    const playerEntitySendDistance = 30;
     // entities.push(new AgentEntity(asset_woodenWall, generateID(), new vec4(10,10), new vec4()));
     
     console.log(`Num Entities: ${entities.length}`);
@@ -18823,7 +18823,7 @@ if (typeof window == "undefined")
             for (let i=0; i<entities.length; i++)
             {
                 const e = entities[i];
-                if (e.position.sub(player.position).getLength() < playerEntitySendDistance)
+                if (e.position.sub(player.targetPosition).getLength() < playerEntitySendDistance)
                 {
                     // str += e.getString();
                     str += stc_entityData(e);
@@ -18881,7 +18881,8 @@ if (typeof window == "undefined")
                         for (let j=0; j<count; j++)
                         {
                             const e = new Entity(assetMap.get(assetName), generateID(), position=entity.position.add(0.5-Math.random(), 0.5-Math.random()), rotation=entity.rotation.add(0.5-Math.random(), 0.5-Math.random()));
-                            output += stc_instantiateEntity(assetName, e.id, e.position, e.rotation);
+                            e.isCollectable = true;
+                            output += stc_instantiateEntity(assetName, e.id, e.position, e.rotation, e.isCollectable);
                             entities.push(e);
                             entitiesMap.set(e.id, e);
                         }
@@ -18947,6 +18948,7 @@ if (typeof window == "undefined")
                 const player = playerMap.get(playerID);
                 if (player instanceof PlayerData)
                 {
+                    player.server_commandsQueue += `stc_deleteLocalEntities,@`;
                     player.server_commandsQueue += compileAllEntities(playerID);
                 }
                 continue;
@@ -19079,6 +19081,33 @@ if (typeof window == "undefined")
         }
     
         
+        for (const key of playerMap.keys())
+        {
+            const p = playerMap.get(key);
+            p.server_commandsQueue += outgoingCommands;
+        }
+    }
+
+    setInterval(updateSlow, 2000);
+    function updateSlow()
+    {
+        let outgoingCommands = "";
+        for (let i in entities)
+        {
+            if (entities[i].growTimestamp_ms != null && Date.now() > entities[i].growTimestamp_ms)
+            {
+                const e = entities[i];
+                // grow={time:100,next:''},
+                const newAsset = assetMap.get(e.asset.grow.next);
+                if (newAsset == undefined) { entities[i].growTimestamp_ms = null; continue; }
+
+                const newE = new Entity(newAsset, generateID(), e.position, e.rotation);
+                entitiesMap.set(newE.id, newE);
+                entitiesMap.set(e.id, undefined);
+                entities[i] = newE;
+            }
+        }
+
         for (const key of playerMap.keys())
         {
             const p = playerMap.get(key);

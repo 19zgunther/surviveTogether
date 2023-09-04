@@ -90,9 +90,9 @@ class Player
             this.mouseIsDown = false;
         }
     }
-    collectEntity(name = "", entityObject = {})
+    collectEntity(assetName = "")
     {
-        switch (name)
+        switch (assetName)
         {
             case "wood": this.numWood++; break;
             case "stone": this.numStone++; break;
@@ -103,9 +103,8 @@ class Player
                     if (this.inventory[i] == null)
                     {
                         // It's easier if we just copy the relavent data...
-                        const copy = new Entity(new vec4(), new vec4(), entityObject.asset);
-                        copy.health = entityObject.health;
-                        this.inventory[i] = copy;
+                        const e = new Entity(assetMap.get(assetName), generateID(), new vec4(), new vec4());
+                        this.inventory[i] = e;
                         break;
                     }
                 }
@@ -574,6 +573,14 @@ function update()
     const dt_s = dt_ms / 1000;
     lastUpdateTimestamp_ms = Date.now();
 
+    // Debug stuff 
+    {
+        if (keydownMap.get('i')) { player.numWood++; }
+        if (keydownMap.get('o')) { player.numStone++; }
+        if (keydownMap.get('p')) { player.numIron++; }
+    }
+
+
     // Resize window
     {
         if (updateNumber % 10 == 0)
@@ -758,14 +765,14 @@ function update()
         }
 
         // Update entityInHand & attacking/using entity/tool
-        {
+        if (player.entityBeingBuilt == null) {
             const entityInHand = player.inventory[player.inventoryIndex];
             let entityInHandUseCooldown_ms = 300;
             if (entityInHand instanceof Entity)
             {
                 entityInHand.position = player.position.copy();
                 entityInHand.rotation = player.rotation.add(3.14, 0, 0);
-                entityInHandUseCooldown_ms =  entityInHand.asset.damage.cooldown_ms;
+                entityInHandUseCooldown_ms =  (entityInHand.asset.damage != null) ? entityInHand.asset.damage.cooldown_ms : 300;
                 const timeSinceLastItemUse_ms = Date.now() - player.entityInHand_lastUsedTimestamp_ms;
                 const percentCooldownCompleted = timeSinceLastItemUse_ms / entityInHandUseCooldown_ms;
                 if (percentCooldownCompleted < 1)
@@ -1004,7 +1011,6 @@ function update()
         gl.renderAllOfThese(orthogonalProjectionMatrix, new mat4().makeTranslationAndScale(new vec4(-0.45*10*scale.x,-0.9,0), scale), new vec4(), new vec4(0.5,0.5,0.5), 0.7, renderMap);
     
         
-
         /////////////  Crafting Inventory ////////////////////////////////
         renderMap.clear();
         renderMap.set("graySquare", []);
@@ -1013,14 +1019,6 @@ function update()
             renderMap.set(assets[i].name, []);
         }
         inventoryMousePosition = mouseGlPosition.mul(aspectRatio,1,1).mul(10,10,10).add(9,-9);
-        // console.log(inventoryMousePosition);
-        renderMap.get("wood").push(
-            {
-                position: inventoryMousePosition, 
-                rotation: new vec4(), 
-                scale: new vec4(1,1,1,1),
-            }
-        )
 
         const recipesThatCanBeCrafted = new Map();
         const recipeTypeMap = new Map();
@@ -1129,69 +1127,12 @@ function update()
             y++;
         }
 
-
-        // let typesXOffset = [];
-        // for (let i in assets)
-        // {
-        //     const a = assets[i];
-        //     if (a.recipe != null)
-        //     {
-        //         let didNotFindTypeInXOffset = true;
-        //         let x = 0;
-        //         let y = 0;
-        //         for (let j in typesXOffset)
-        //         {
-        //             if (typesXOffset[j].type == a.type)
-        //             {
-        //                 typesXOffset[j].xOffset += 1;
-        //                 didNotFindTypeInXOffset = false;
-        //                 x = typesXOffset[j].xOffset;
-        //                 y = j;
-        //                 break;
-        //             }
-        //         }
-        //         if (didNotFindTypeInXOffset)
-        //         {
-        //             typesXOffset.push({
-        //                 type:a.type,
-        //                 xOffset:0,
-        //             });
-        //             y = typesXOffset.length-1;
-        //             x = 0;
-        //         }
-
-        //         if (renderMap.get(a.name) == undefined)
-        //         {
-        //             renderMap.set(a.name, []);
-        //         }
-
-        //         renderMap.get(a.name).push(
-        //             {
-        //                 position: new vec4(x,-y,100),
-        //                 rotation: new vec4(0,0,-1.57),
-        //                 scale: new vec4(0.8,0.8,0.8),
-        //                 reflectivity: 0,
-        //             }
-        //         )
-
-        //         if (player.canPurchaseRecipe(a.recipe))
-        //         {
-        //             renderMap.get("graySquare").push(
-        //                 {
-        //                     position: new vec4(x,-y+0.5,1),
-        //                     rotation: new vec4(0,0,0),
-        //                     scale: new vec4(0.9,0.9,0.9),
-        //                     reflectivity: 0,
-        //                 }
-        //             )
-        //         }
-        //     }
-        // }
         gl.clearDepthBuffer();
         gl.renderAllOfThese(orthogonalProjectionMatrix, new mat4().makeTranslationAndScale(new vec4(-0.9*10*scale.x,0.9,0), scale), new vec4(), new vec4(0.5,0.5,0.5), 0.7, renderMap);
     }
 
     mouseWentDown = false;
+    // console.log(entities.length);
 }
 
 
@@ -1201,7 +1142,6 @@ function update()
 
 
 // http://35.153.49.211:3001/
-
 // Create a WebSocket client instance
 url = "ws://"+window.location.hostname+":8080"
 console.log("websocket url: ",url);
@@ -1243,14 +1183,16 @@ ws.addEventListener('message', (event) => {
             const data = parse_stc_givePlayerEntity(command);
             if (data.playerID == player.id)
             {
-                switch(data.entityName)
-                {
-                    case "wood": player.numWood++; break;
-                    case "stone": player.numStone++; break;
-                    case "iron": player.numIron++; break;
-                    default:
-                        console.log(`GIVE PLAYER '${data.entityName}'`);
-                }
+                player.collectEntity(data.entityName)
+                // switch(data.entityName)
+                // {
+                //     case "wood": player.numWood++; break;
+                //     case "stone": player.numStone++; break;
+                //     case "iron": player.numIron++; break;
+                //     default:
+                //         player.collectEntity(data.entityName)
+                //         console.log(`GIVE PLAYER '${data.entityName}'`);
+                // }
             }
             continue;
         }
@@ -1344,6 +1286,8 @@ ws.addEventListener('message', (event) => {
             {
                 e.position = data.position;
                 e.rotation = data.rotation;
+                e.health = data.health;
+                e.isCollectable = data.isCollectable;
             } else {
                 const asset = assetMap.get(data.assetName);
                 if (asset == undefined)
@@ -1351,6 +1295,9 @@ ws.addEventListener('message', (event) => {
                     continue;
                 }
                 e = new Entity(asset, data.entityID, data.position, data.rotation);
+                e.health = data.health;
+                e.isCollectable = data.isCollectable;
+                if (e.isCollectable) { console.log("collectable",e.asset.name);}
                 entitiesMap.set(e.id, e);
                 entities.push(e);
                 console.log("creating new entity")
@@ -1368,8 +1315,16 @@ ws.addEventListener('message', (event) => {
                 continue;
             }
             const e = new Entity(asset, data.entityID, data.position, data.rotation);
+            e.isCollectable = data.isCollectable;
             entitiesMap.set(e.id, e);
             entities.push(e);
+            continue;
+        }
+        if (command.startsWith("stc_deleteLocalEntities"))
+        {
+            // This is sent by the server right before all nearby entities are sent. This is used to maintain sync with the server by deleting local stuff
+            entities.splice(0,entities.length);
+            entitiesMap.clear();
             continue;
         }
         if (command == "" || command == " ")
@@ -1380,7 +1335,7 @@ ws.addEventListener('message', (event) => {
     }
 });
 
-setInterval(websocket_quickUpdate, 50);
+setInterval(websocket_quickUpdate, 100);
 function websocket_quickUpdate()
 {
     if (ws.readyState != ws.OPEN) { return; }
@@ -1391,7 +1346,7 @@ function websocket_quickUpdate()
 }
 
 websocket_slowUpdate();
-setInterval(websocket_slowUpdate, 1000);
+setInterval(websocket_slowUpdate, 2000);
 function websocket_slowUpdate()
 {
     outgoingCommands += `cts_getAllEntities,@`;
