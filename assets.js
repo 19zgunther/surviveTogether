@@ -18802,7 +18802,7 @@ if (typeof window == "undefined")
     const entitiesMap = new Map();
     const playerMap = new Map();
     const playerEntitySendDistance = 50;
-    entities.push(new AgentEntity(asset_woodenWall, generateID(), new vec4(10,10), new vec4()));
+    // entities.push(new AgentEntity(asset_woodenWall, generateID(), new vec4(10,10), new vec4()));
     
     console.log(`Num Entities: ${entities.length}`);
     
@@ -18997,6 +18997,9 @@ if (typeof window == "undefined")
         // Event listener for when the client closes the connection
         ws.on('close', () => {
             console.log('Client disconnected');
+        });
+        ws.on('open', () => {
+            console.log('Client connected');
         });
     });
     

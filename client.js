@@ -727,9 +727,9 @@ function update()
             }
 
             // Set rotation
-            if (Date.now() - player.entityInHand_lastUsedTimestamp_ms > 1000)
+            if (Date.now() - player.entityInHand_lastUsedTimestamp_ms > 1000 || player.entityBeingBuilt != null)
             {
-                player.rotation.x = player.rotation.x*0.9 + 0.1*Math.atan2( mouseGlPosition.y, mouseGlPosition.x );
+                player.rotation.x = player.rotation.x*0.8 + 0.2*Math.atan2( mouseGlPosition.y, mouseGlPosition.x );
             }
 
             player.position.x = Math.max(Math.min(player.position.x, 50), -50);
@@ -1202,10 +1202,10 @@ function update()
 
 
 
-
 // Create a WebSocket client instance
-const ws = new WebSocket('ws://35.153.49.211:8080');
-// const ws = new WebSocket('ws://localhost:8080')
+url = "ws://"+window.location.hostname+":8080"
+console.log("websocket url: ",url);
+const ws = new WebSocket(url)
 
 // Event listener for when the connection is established
 ws.addEventListener('open', () => {
