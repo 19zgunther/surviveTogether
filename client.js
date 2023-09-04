@@ -114,7 +114,28 @@ class Player
                 break;
         }
         return wasAbleToCollect;
-        console.log("Wood:"+this.numWood+" Stone:"+this.numStone+" Iron:"+this.numIron);
+    }
+    canCollectEntity(assetName = "")
+    {
+        let wasAbleToCollect = true;
+        switch (assetName)
+        {
+            case "wood": break;
+            case "stone": break;
+            case "iron": break;
+            default:
+                wasAbleToCollect = false;
+                for (let i in this.inventory)
+                {
+                    if (this.inventory[i] == null)
+                    {
+                        wasAbleToCollect = true;
+                        break;
+                    }
+                }
+                break;
+        }
+        return wasAbleToCollect;
     }
     _updateMovement(dt_s, entities)
     {
@@ -615,12 +636,22 @@ function update()
         for (let i in entities)
         {
             const e = entities[i];
-            if (e.targetPosition != undefined)
+            let ms_to_arrival = e.arrivalTimestamp_ms - Date.now();
+            if (ms_to_arrival > 0)
             {
-                // e.position = e.position.mul(0.98).add(e.targetPosition.mul(0.02));
-                const vecToTargetPos = e.targetPosition.sub(e.position).scaleToUnit();
-                e.position.addi(vecToTargetPos.mul(e.velocity * dt_s));
+                const vecToTargetPos = e.targetPosition.sub(e.position);
+                // console.log("ms_to_arrival, ",ms_to_arrival, vecToTargetPos.mul( dt_ms/ms_to_arrival ),  dt_ms/ms_to_arrival);
+
+                // console.log(e.targetPosition, e.position);
+        
+                e.position.addi(vecToTargetPos.mul( dt_ms/ms_to_arrival ));
+            } else {
+                // console.log(ms_to_arrival);
+                e.position = e.targetPosition.copy();
+                e.rotation = e.targetRotation.copy();
+                e.arrivalTimestamp_ms = -1;
             }
+            
         }
         let i=0;
         while (i<entities.length)
@@ -651,9 +682,10 @@ function update()
             {
                 entitiesCloseToPlayer.push(entities[i]);
             }
-            if (distanceToPlayer < player.collectRadius && entities[i].isCollectable)
+            if (distanceToPlayer < player.collectRadius && entities[i].isCollectable && player.canCollectEntity())
             {
                 // console.log(`\n\nReqesting collect ${entities[i].id}`);
+
                 outgoingCommands += cts_collectEntity(player.id, entities[i].id);
             }
 
@@ -1174,10 +1206,8 @@ function update()
 
 
 
+// http://44.199.231.142:3001/
 
-
-
-// http://35.153.49.211:3001/
 // Create a WebSocket client instance
 url = "ws://"+window.location.hostname+":8080"
 console.log("websocket url: ",url);
@@ -1234,6 +1264,8 @@ ws.addEventListener('message', (event) => {
         }
         if (command.startsWith("stc_setEntityPositionRotation"))
         {
+            console.error("stc_setEntityPositionRotation is depreciated");
+            continue;
             const data = parse_stc_setEntityPositionRotation(command);
             // return {
             //     entityID:arr[1],
@@ -1318,24 +1350,32 @@ ws.addEventListener('message', (event) => {
         {
             const data = parse_stc_entityData(command);
             let e = entitiesMap.get(data.entityID);
-            if (e != undefined && e instanceof Entity)
+            if (e instanceof Entity)
             {
-                e.position = data.position;
-                e.rotation = data.rotation;
-                e.health = data.health;
-                e.isCollectable = data.isCollectable;
+    
             } else {
                 const asset = assetMap.get(data.assetName);
                 if (asset == undefined)
                 {
                     continue;
                 }
-                e = new Entity(asset, data.entityID, data.position, data.rotation, data.isCollectable);
-                e.health = data.health;
+                e = new Entity(asset, data.entityID, data.position.copy(), data.rotation.copy(), data.isCollectable);
                 entitiesMap.set(e.id, e);
                 entities.push(e);
                 console.log("creating new entity")
             }
+            e.targetPosition = data.position.copy();
+            e.targetRotation = data.rotation.copy();
+            // console.log("DATA: data.arrivalTimestamp_ms",data.arrivalTimestamp_ms);
+            // if (data.arrivalTimestamp_ms < 10)
+            // {
+            //     e.position = data.position.copy();
+            //     e.rotation = data.rotation.copy();
+            //     data.arrivalTimestamp_ms = -1;
+            // }
+            e.health = data.health;
+            e.isCollectable = data.isCollectable;
+            e.arrivalTimestamp_ms = data.arrivalTimestamp_ms;
             continue;
         }
         if (command.startsWith("stc_instantiateEntity"))

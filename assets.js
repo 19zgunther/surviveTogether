@@ -18120,6 +18120,9 @@ class Entity
         this.id             = id;
         this.position       = position;
         this.rotation       = rotation;
+        this.targetPosition       = position.copy();
+        this.targetRotation       = rotation.copy();
+        this.arrivalTimestamp_ms = -1;
         this.scale          = new vec4(1,1,1);
         this.reflectivity   = 0;
         
@@ -18165,7 +18168,7 @@ class AgentEntity extends Entity
         this.lastAttackTimestamp_ms = 0;
         this.attackCooldown_ms = 500;
 
-        this.speed = 1;
+        this.velocity = 1;
         this.shouldRenderPath = false;
 
         this.path = [];
@@ -18188,11 +18191,11 @@ class AgentEntity extends Entity
             const vecEnemyToFirstPoint = firstPoint.sub(this.position);
             const distToPoint = vecEnemyToFirstPoint.getLength();
             vecEnemyToFirstPoint.scaleToUnit();
-            // this.position = this.position.addi(vecEnemyToFirstPoint.mul(this.speed * dt));
+            // this.position = this.position.addi(vecEnemyToFirstPoint.mul(this.velocity * dt));
             return {
                 targetPosition: firstPoint,
                 targetRotation: new vec4(),
-                targetTimestamp: Date.now() + 1000 * distToPoint / this.speed,
+                targetTimestamp: Date.now() + 1000 * distToPoint / this.velocity,
             }
         }
         return {
@@ -18320,7 +18323,7 @@ class AgentEntity extends Entity
 
             if (path instanceof Array && path.length >= 2)
             {
-                this.path = path; 
+                this.path = path;
             }
             this.isObstructed = isObstructed;
         }
@@ -18360,7 +18363,7 @@ class AgentEntity extends Entity
                 this.path.shift();
             }
             vecEnemyToFirstPoint.scaleToUnit();
-            this.position = this.position.addi(vecEnemyToFirstPoint.mul(this.speed * dt));
+            this.position = this.position.addi(vecEnemyToFirstPoint.mul(this.velocity * dt));
         }     
 
         // Render path we're following
@@ -18670,40 +18673,39 @@ function parse_stc_instantiateEntity(message = "")
         isCollectable: (arr[9] == 'true') ? true : false
     }
 }
-function stc_setEntityPositionRotation(entityID, position, rotation, velocity=-1)
-{
-    return `stc_setEntityPositionRotation,${entityID},${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)},${rotation.x.toFixed(2)},${rotation.y.toFixed(2)},${rotation.z.toFixed(2)},${velocity}@`;
-}
-function parse_stc_setEntityPositionRotation(message = "")
-{
-    const arr = message.split(',');
-    return {
-        entityID:arr[1],
-        position:new vec4(Number(arr[2]),Number(arr[3]),Number(arr[4])),
-        rotation:new vec4(Number(arr[5]),Number(arr[6]),Number(arr[7])),
-        velocity:Number(arr[8])
-    }
-}
-function stc_setEntityTarget(entityID, position, rotation, arrivalTimestamp_ms=Date.now())
-{
-    return `stc_setEntityTarget,${entityID},${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)},${rotation.x.toFixed(2)},${rotation.y.toFixed(2)},${rotation.z.toFixed(2)},${arrivalTimestamp_ms}@`;
-}
-function parse_stc_setEntityTarget(message = "")
-{
-    const arr = message.split(',');
-    return {
-        entityID:arr[1],
-        position:new vec4(Number(arr[2]),Number(arr[3]),Number(arr[4])),
-        rotation:new vec4(Number(arr[5]),Number(arr[6]),Number(arr[7])),
-        arrivalTimestamp_ms:Number(arr[8])
-    }
-}
+// function stc_setEntityPositionRotation(entityID, position, rotation, velocity=-1)
+// {
+//     return `stc_setEntityPositionRotation,${entityID},${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)},${rotation.x.toFixed(2)},${rotation.y.toFixed(2)},${rotation.z.toFixed(2)},${velocity}@`;
+// }
+// function parse_stc_setEntityPositionRotation(message = "")
+// {
+//     const arr = message.split(',');
+//     return {
+//         entityID:arr[1],
+//         position:new vec4(Number(arr[2]),Number(arr[3]),Number(arr[4])),
+//         rotation:new vec4(Number(arr[5]),Number(arr[6]),Number(arr[7])),
+//         velocity:Number(arr[8])
+//     }
+// }
+// function stc_setEntityTarget(entityID, position, rotation, arrivalTimestamp_ms=Date.now())
+// {
+//     return `stc_setEntityTarget,${entityID},${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)},${rotation.x.toFixed(2)},${rotation.y.toFixed(2)},${rotation.z.toFixed(2)},${arrivalTimestamp_ms}@`;
+// }
+// function parse_stc_setEntityTarget(message = "")
+// {
+//     const arr = message.split(',');
+//     return {
+//         entityID:arr[1],
+//         position:new vec4(Number(arr[2]),Number(arr[3]),Number(arr[4])),
+//         rotation:new vec4(Number(arr[5]),Number(arr[6]),Number(arr[7])),
+//         arrivalTimestamp_ms:Number(arr[8])
+//     }
+// }
 function stc_entityData(entity)
 {
     const p = entity.position;
     const r = entity.rotation;
-
-    return `stc_entityData,${entity.asset.name},${entity.id},${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)},${r.x.toFixed(2)},${r.y.toFixed(2)},${r.z.toFixed(2)},${entity.health},${entity.isCollectable}@`;
+    return `stc_entityData,${entity.asset.name},${entity.id},${entity.health},${entity.isCollectable},${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)},${r.x.toFixed(2)},${r.y.toFixed(2)},${r.z.toFixed(2)},${entity.arrivalTimestamp_ms},@`;
 }
 function parse_stc_entityData(message = "")
 {
@@ -18711,11 +18713,11 @@ function parse_stc_entityData(message = "")
     return {
         assetName:arr[1],
         entityID:arr[2],
-        position:new vec4(Number(arr[3]),Number(arr[4]),Number(arr[5])),
-        rotation:new vec4(Number(arr[6]),Number(arr[7]),Number(arr[8])),
-        health: Number(arr[9]),
-        isCollectable: (arr[10] == 'true') ? true : false,
-        arrivalTimestamp_ms: Date.now()
+        health: Number(arr[3]),
+        isCollectable: (arr[4] == 'true') ? true : false,
+        position:new vec4(Number(arr[5]),Number(arr[6]),Number(arr[7])),
+        rotation:new vec4(Number(arr[8]),Number(arr[9]),Number(arr[10])),
+        arrivalTimestamp_ms: isNaN(Number(arr[11])) ? -1 : Number(arr[11])
     }
 }
 function cts_playerData(player)
@@ -18801,8 +18803,7 @@ if (typeof window == "undefined")
             // Return all entitieus
             for (let i=0; i<entities.length; i++)
             {
-                const e = entities[i];
-                str += e.getString();
+                str += stc_entityData( entities[i]);
             }
         } else {
             // Return only nearby entities
@@ -18811,7 +18812,6 @@ if (typeof window == "undefined")
                 const e = entities[i];
                 if (e.position.sub(player.targetPosition).getLength() < playerEntitySendDistance)
                 {
-                    // str += e.getString();
                     str += stc_entityData(e);
                 }
             }
@@ -18824,12 +18824,7 @@ if (typeof window == "undefined")
         // return "TODO: write serverside compleAllCommands"
         const p = playerMap.get(playerID);
         if (p == undefined) { console.error("Error: playerMap does not have playerID:",playerID); return ""; }
-    
-        // let str = "";
-        // for (let i in p.server_commandsQueue)
-        // {
-        //     str += p.server_commandsQueue[i].getString();
-        // }
+
         const temp = p.server_commandsQueue;
         p.server_commandsQueue = "";
         return temp;
@@ -18839,6 +18834,8 @@ if (typeof window == "undefined")
     {
         let output = "";
         const arr = message.split('@');
+        let player = playerMap.get(playerID);
+        if (player == undefined) { console.error("player with id ",playerID," was not found"); }
     
         for (let i_ in arr)
         {
@@ -18884,7 +18881,6 @@ if (typeof window == "undefined")
                 if (entity != undefined && entity.health > 0)
                 {
                     entity.health = -1;
-                    output += stc_setEntityHealth(data.entityID, -1);
                     output += stc_givePlayerEntity(data.playerID, entity.asset.name);
                 }
                 continue;
@@ -18895,37 +18891,36 @@ if (typeof window == "undefined")
                 output += command + "@";
                 data.scale = new vec4(1,1,1)
                 const playerID = data.playerID;
-                let playerData = playerMap.get(playerID)
-                if (playerData instanceof PlayerData)
+                if (player instanceof PlayerData)
                 {
-                    playerData.startPosition = playerData.position;
-                    playerData.startRotation = playerData.rotation;
-                    playerData.startScale = playerData.scale;
+                    player.startPosition = player.position;
+                    player.startRotation = player.rotation;
+                    player.startScale = player.scale;
 
-                    playerData.targetPosition = data.position;
-                    playerData.targetRotation = data.rotation;
-                    playerData.targetScale = data.scale;
+                    player.targetPosition = data.position;
+                    player.targetRotation = data.rotation;
+                    player.targetScale = data.scale;
 
-                    playerData.pTimestamp_ms  = playerData.timestamp_ms;
-                    playerData.timestamp_ms   = Date.now();
+                    player.pTimestamp_ms  = player.timestamp_ms;
+                    player.timestamp_ms   = Date.now();
                 } else {
-                    playerData = new PlayerData();
-                    playerData.position   = data.position.copy();
-                    playerData.rotation   = data.rotation.copy();
-                    playerData.scale      = data.scale.copy();
+                    player = new PlayerData(playerID);
+                    player.position   = data.position.copy();
+                    player.rotation   = data.rotation.copy();
+                    player.scale      = data.scale.copy();
 
-                    playerData.startPosition   = data.position;
-                    playerData.startRotation   = data.rotation;
-                    playerData.startScale      = data.scale;
+                    player.startPosition   = data.position;
+                    player.startRotation   = data.rotation;
+                    player.startScale      = data.scale;
                     
-                    playerData.targetPosition   = data.position;
-                    playerData.targetRotation   = data.rotation;
-                    playerData.targetScale      = data.scale;
+                    player.targetPosition   = data.position;
+                    player.targetRotation   = data.rotation;
+                    player.targetScale      = data.scale;
 
-                    playerData.pTimestamp_ms   = Date.now();
-                    playerData.timestamp_ms    = Date.now();
+                    player.pTimestamp_ms   = Date.now();
+                    player.timestamp_ms    = Date.now();
                     
-                    playerMap.set(playerID, playerData);
+                    playerMap.set(playerID, player);
                 }
                 continue;
             }
@@ -19034,36 +19029,35 @@ if (typeof window == "undefined")
         let outgoingCommands = "";
         for (let i1 in entities)
         {
-            if (!(entities[i1] instanceof AgentEntity))
-            {
-                continue;
-            }
             const e = entities[i1];
-    
-            // First, find the closest player
-            let closestPlayer = null;
-            let closestPlayerDistance = 100000;
-            for (const key of playerMap.keys())
+            if (e instanceof AgentEntity)
             {
-                const p = playerMap.get(key);
-                const dist = p.targetPosition.sub(e.position).getLength();
-                if (dist < closestPlayerDistance)
+                // First, find the closest player
+                let closestPlayer = null;
+                let closestPlayerDistance = 100000;
+                for (const key of playerMap.keys())
                 {
-                    closestPlayer = p;
-                    closestPlayerDistance = dist;
+                    const p = playerMap.get(key);
+                    const dist = p.targetPosition.sub(e.position).getLength();
+                    if (dist < closestPlayerDistance)
+                    {
+                        closestPlayer = p;
+                        closestPlayerDistance = dist;
+                    }
+                }
+                if (closestPlayer != null)
+                {
+                    e.update(closestPlayer.targetPosition, entities);
+                    const path = e.path;
+                    const target = path[1];
+                    if (target instanceof vec4)
+                    {
+                        const distToTarget = e.position.sub(target).getLength();
+                        const dt_s_toTarget = distToTarget/e.velocity;
+                        e.arrivalTimestamp_ms = Date.now() + Math.round(dt_s_toTarget * 1000);
+                    }
                 }
             }
-            if (closestPlayer != null)
-            {
-                e.update(closestPlayer.targetPosition, entities);
-                // outgoingCommands += stc_setEntityPositionRotation(e.id, closestPlayer.targetPosition, closestPlayer.targetRotation, 0.4);
-                
-                // // e.position = 
-                // const vecToTarget = closestPlayer.targetPosition.sub(e.position).scaleToUnit();
-                // e.position.addi(vecToTarget.mul(0.2*0.4));
-                // e.update(closestPlayer.targetPosition, entities);
-            }
-
         }
     
         
@@ -19099,5 +19093,9 @@ if (typeof window == "undefined")
             const p = playerMap.get(key);
             p.server_commandsQueue += outgoingCommands;
         }
+
+        // const e = new AgentEntity(asset_firTree1, generateID(), new vec4(5-Math.random()*10, 5-Math.random()*10), new vec4());
+        // entitiesMap.set(e.id, e);
+        // entities.push(e);
     }
 }
