@@ -785,7 +785,7 @@ function update()
                 // Remove from inventory, throw on ground, isCollectable=true
                 const e = player.inventory[player.inventoryIndex];
                 const angle = player.rotation.x;
-                e.position = player.position.add(Math.cos(angle), Math.sin(angle));
+                e.position = player.position.add(1.2*Math.cos(angle), 1.2*Math.sin(angle));
                 e.rotation = player.rotation.add(1.57,);
                 outgoingCommands += stc_instantiateEntity(e.asset.name, e.id, e.position, e.rotation, true);
                 player.inventory[player.inventoryIndex] = null;
@@ -917,9 +917,10 @@ function update()
 
             // Add other player's asset in hand, and compute rotation of tool
             const assetInHand = assetMap.get(p.entityInHand_assetName);
-            if (assetInHand != null) {
+            if (assetInHand instanceof Entity) {
                 let rot = p.rotation.copy().add(3.14,0,0);
-                const percentCooldownCompleted = (Date.now() - p.entityInHand_lastUsedTimestamp_ms) / assetInHand.damage.cooldown_ms;
+                const cooldown_ms = (assetInHand.damage != null) ? assetInHand.damage.cooldown_ms : 300;
+                const percentCooldownCompleted = (Date.now() - p.entityInHand_lastUsedTimestamp_ms) / cooldown_ms;
                 if (percentCooldownCompleted < 1)
                 {
                     rot = p.rotation.add(3.14,(percentCooldownCompleted-1),0);
