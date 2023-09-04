@@ -727,7 +727,13 @@ function update()
             }
 
             // Set rotation
-            player.rotation.x = Math.atan2( mouseGlPosition.y, mouseGlPosition.x );
+            if (Date.now() - player.entityInHand_lastUsedTimestamp_ms > 1000)
+            {
+                player.rotation.x = player.rotation.x*0.9 + 0.1*Math.atan2( mouseGlPosition.y, mouseGlPosition.x );
+            }
+
+            player.position.x = Math.max(Math.min(player.position.x, 50), -50);
+            player.position.y = Math.max(Math.min(player.position.y, 50), -50);
         }
 
         // Update player health regeneration
@@ -773,22 +779,36 @@ function update()
                 const damageObj = (entityInHand != null && entityInHand.damage != undefined) ? entityInHand.damage : {attackDamage:1, chopDamage:1, mineDamage:1, range:0.5, cooldown_ms:300};
                 
                 const vecFromPlayerToHitPos = new vec4(Math.cos(player.rotation.x), Math.sin(player.rotation.x)).scaleToUnit();
+                
+                // for (let dist=0.1; dist<damageObj.range; dist+=0.1)
+                // {
+                //     const pos = vecFromPlayerToHitPos.mul(dist).add(player.position);
+                //     for (let i in entitiesCloseToPlayer)
+                //     {
+                //         if (entitiesCloseToPlayer[i].getIsInsideBoundingCylinder(pos))
+                //         {
+                //             entityHit = entitiesCloseToPlayer[i];
+                //             break;
+                //         }
+                //     }
+                //     if (entityHit != null){break;}
+                // }
                 let entityHit = null;
-                for (let dist=0.1; dist<damageObj.range; dist+=0.1)
+                let closestEntityDist = 10000;
+                for (let i in entitiesCloseToPlayer)
                 {
-                    const pos = vecFromPlayerToHitPos.mul(dist).add(player.position);
-                    for (let i in entitiesCloseToPlayer)
-                    {
-                        if (entitiesCloseToPlayer[i].getIsInsideBoundingCylinder(pos))
-                        {
-                            entityHit = entitiesCloseToPlayer[i];
-                            break;
-                        }
+                    const dist = entitiesCloseToPlayer[i].position.sub(player.position).getLength();
+                    if (dist < closestEntityDist && dist < damageObj.range + entitiesCloseToPlayer[i].asset.boundingCylinderRadius) { 
+                        entityHit = entitiesCloseToPlayer[i]; 
+                        closestEntityDist = dist;
                     }
-                    if (entityHit != null){break;}
                 }
+
                 if (entityHit instanceof Entity && !entityHit.isCollectable)
                 {
+                    const angle = Math.atan2(entityHit.position.y-player.position.y, entityHit.position.x-player.position.x);
+                    player.rotation.x = angle;
+
                     const damageAmount = computeDamageAmount(entityHit, damageObj);
                     outgoingCommands += cts_applyDamageToEntity(entityHit.id, damageAmount);
                 }
@@ -910,7 +930,6 @@ function update()
             renderMap.set(assets[i].name, []);
         }
 
-
         let inventoryMousePosition = mouseGlPosition.mul(aspectRatio,1,1).mul(10,10,10).add(4.5,9);
 
         for (let i in player.inventory)
@@ -949,6 +968,38 @@ function update()
                 }
             )
         }
+
+        // Add wood, stone, and iron to the list
+        {
+            for (let i=0; i<player.numWood; i++)
+            {
+                renderMap.get("wood").push(
+                    {
+                        position: new vec4(i/5+9,0,0),
+                        rotation: new vec4(1,1),
+                    }
+                )
+            }
+            for (let i=0; i<player.numStone; i++)
+            {
+                renderMap.get("stone").push(
+                    {
+                        position: new vec4(i/5+9,0.5,0),
+                        rotation: new vec4(1,1),
+                    }
+                )
+            }
+            for (let i=0; i<player.numIron; i++)
+            {
+                renderMap.get("iron").push(
+                    {
+                        position: new vec4(i/5+9,1,0),
+                        rotation: new vec4(1,1),
+                    }
+                )
+            }
+        }
+
         gl.clearDepthBuffer();
         gl.renderAllOfThese(orthogonalProjectionMatrix, new mat4().makeTranslationAndScale(new vec4(-0.45*10*scale.x,-0.9,0), scale), new vec4(), new vec4(0.5,0.5,0.5), 0.7, renderMap);
     
@@ -1154,6 +1205,7 @@ function update()
 
 // Create a WebSocket client instance
 const ws = new WebSocket('ws://35.153.49.211:8080');
+// const ws = new WebSocket('ws://localhost:8080')
 
 // Event listener for when the connection is established
 ws.addEventListener('open', () => {
@@ -1175,7 +1227,10 @@ ws.addEventListener('message', (event) => {
         {
             const data = parse_stc_setEntityHealth(command);
             const e = entitiesMap.get(data.entityID);
-            if (e == undefined) { console.error("Command 'stc_setEntityHealth' failed. Entity was not found in map. Command:",command); continue; }
+            if (e == undefined) { 
+                //console.error("Command 'stc_setEntityHealth' failed. Entity was not found in map. Command:",command); 
+                continue; 
+            }
             if (e.health > data.entityHealth)
             {
                 e.tookDamageTimestamp_ms = Date.now();
@@ -1336,7 +1391,7 @@ function websocket_quickUpdate()
 }
 
 websocket_slowUpdate();
-setInterval(websocket_slowUpdate, 5000);
+setInterval(websocket_slowUpdate, 1000);
 function websocket_slowUpdate()
 {
     outgoingCommands += `cts_getAllEntities,@`;

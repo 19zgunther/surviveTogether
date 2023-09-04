@@ -18796,12 +18796,9 @@ if (typeof window == "undefined")
     app.get('/speedyGL.js', function (req, res) {
         res.sendFile(__dirname+'/speedyGL.js');
     });
-    app.get('/websocketClient.js', function (req, res) {
-        res.sendFile(__dirname+'/websocketClient.js');
-    });
     
     
-    const entities = generate_world(200);
+    const entities = [];//generate_world(200);
     const entitiesMap = new Map();
     const playerMap = new Map();
     const playerEntitySendDistance = 50;
@@ -18851,40 +18848,6 @@ if (typeof window == "undefined")
         p.server_commandsQueue = "";
         return temp;
     }
-    
-    // function compileAllPlayersData(playerID="playerID")
-    // {
-    //     let str = "";
-    //     for (const key of playerMap.keys())
-    //     {
-    //         const p = playerMap.get(key);
-    //         if (Date.now() - p.timestamp_ms > 2000)
-    //         {
-    //             playerMap.delete(key); continue;
-    //         }
-    
-    //         if (playerID == p.id) { continue; }
-    
-    //         str += p.string;
-    //     }
-    //     return str;
-    // }
-    
-    // function injestPlayerData(message = "")
-    // {
-    //     try {
-    //         const arr = message.split(",");
-    //         const playerID = arr[0];
-    //         if (playerMap.get(playerID) instanceof PlayerData)
-    //         {
-    //             playerMap.get(playerID).parse(message);
-    //         } else {
-    //             playerMap.set(playerID, new PlayerData().parse(message));
-    //         }
-    //     } catch {
-    //         console.log("failed to injest player data");
-    //     }
-    // }
     
     function injestCommands(playerID = "", message = "")
     {
@@ -19059,6 +19022,23 @@ if (typeof window == "undefined")
     setInterval(updateFast, 100);
     function updateFast()
     {
+        if (playerMap.keys().next().done)
+        {
+            entities.splice(0, entities.length);
+            entitiesMap.clear();
+            return;
+        }
+        if (entities.length == 0)
+        {
+            console.log("generating world.")
+            let temp = generate_world(200);
+            for (let i in temp)
+            {
+                entities.push(temp[i]);
+            }
+            syncEntitiesMapAndArray();
+        }
+
         const t = Date.now();
         let outgoingCommands = "";
         for (let i1 in entities)
@@ -19095,13 +19075,11 @@ if (typeof window == "undefined")
 
         }
     
-    
+        
         for (const key of playerMap.keys())
         {
             const p = playerMap.get(key);
             p.server_commandsQueue += outgoingCommands;
         }
-    
-        // console.log("dt_ms:",Date.now()-t);
     }
 }
