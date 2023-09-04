@@ -382,15 +382,15 @@ class Player
         for (let j in recipe)
         {
             const r = recipe[j];
-            if (r.entity == 'wood')
+            if (r.assetName == 'wood')
             {
                 this.numWood -= r.count;
             }
-            if (r.entity == 'stone')
+            if (r.assetName == 'stone')
             {
                 this.numStone -= r.count;
             }
-            if (r.entity == 'iron')
+            if (r.assetName == 'iron')
             {
                 this.numIron -= r.count;
             }
@@ -1200,7 +1200,7 @@ function update()
 
 
 
-
+// http://35.153.49.211:3001/
 
 // Create a WebSocket client instance
 url = "ws://"+window.location.hostname+":8080"
