@@ -92,12 +92,14 @@ class Player
     }
     collectEntity(assetName = "")
     {
+        let wasAbleToCollect = true;
         switch (assetName)
         {
             case "wood": this.numWood++; break;
             case "stone": this.numStone++; break;
             case "iron": this.numIron++; break;
             default:
+                wasAbleToCollect = false;
                 for (let i in this.inventory)
                 {
                     if (this.inventory[i] == null)
@@ -105,15 +107,18 @@ class Player
                         // It's easier if we just copy the relavent data...
                         const e = new Entity(assetMap.get(assetName), generateID(), new vec4(), new vec4());
                         this.inventory[i] = e;
+                        wasAbleToCollect = true;
                         break;
                     }
                 }
                 break;
         }
+        return wasAbleToCollect;
         console.log("Wood:"+this.numWood+" Stone:"+this.numStone+" Iron:"+this.numIron);
     }
     _updateMovement(dt_s, entities)
     {
+        return;
         // Movement
         const moveVec = new vec4();
         if (this.keydownMap.get("w"))
@@ -198,6 +203,7 @@ class Player
     }
     update(commandList=[], entities=[])
     {
+        return;
         const dt_s = (Date.now() - this.lastUpdateTimestamp_ms)/1000;
         this.lastUpdateTimestamp_ms = Date.now();
         this._updateMovement(dt_s, entities);
@@ -397,6 +403,7 @@ class Player
     }
     applyDamage(damage = {})
     {
+        return;
         if (!isNaN(damage))
         {
             this.health -= damage;
@@ -431,6 +438,7 @@ const otherPlayers = [];
 const keydownMap = new Map();
 var mouseIsDown = false;
 var mouseWentDown = false;
+var mouseWheelChange = 0;
 const mousePixelPosition = new vec4();
 const mouseGlPosition = new vec4();
 const mouseDownPixelPosition = new vec4();
@@ -445,6 +453,7 @@ window.addEventListener("mousemove", eventListener);
 window.addEventListener("mouseup", eventListener);
 window.addEventListener("keydown", eventListener);
 window.addEventListener("keyup", eventListener);
+window.addEventListener("wheel", eventListener);
 function eventListener(event)
 {
     if (event.type == 'keydown')
@@ -485,6 +494,9 @@ function eventListener(event)
         mouseUpGlPosition.y = 1.0 - event.offsetY * 2.0 / canvasElement.clientHeight;
         mouseIsDown = false;
         // this.mouseIsDown = false;
+    } else if (event.type == 'wheel')
+    {
+        mouseWheelChange = event.deltaY;
     }
 }
 function setup()
@@ -755,86 +767,104 @@ function update()
 
         // Update inventory (index)
         {
+            const others=[')','!','@','#','$','%','^','&','*','('];
             for (let i=1; i<10; i++)
             {
-                if (keydownMap.get(''+i))
+                if (keydownMap.get(''+i) || keydownMap.get(others[i]))
                 {
                     player.inventoryIndex = i - 1;
                 }
             }
+            if (mouseWheelChange > 0) { player.inventoryIndex += 1; }
+            else if (mouseWheelChange < 0) { player.inventoryIndex -= 1; }
+            if (player.inventoryIndex < 0) { player.inventoryIndex = 8; }
+            if (player.inventoryIndex > 8) { player.inventoryIndex = 0; }
+
+            if ((keydownMap.get('q') || keydownMap.get('Q')) && player.inventory[player.inventoryIndex] != null)
+            {
+                // Remove from inventory, throw on ground, isCollectable=true
+                const e = player.inventory[player.inventoryIndex];
+                const angle = player.rotation.x;
+                e.position = player.position.add(Math.cos(angle), Math.sin(angle));
+                e.rotation = player.rotation.add(1.57,);
+                outgoingCommands += stc_instantiateEntity(e.asset.name, e.id, e.position, e.rotation, true);
+                player.inventory[player.inventoryIndex] = null;
+            }
+
         }
 
         // Update entityInHand & attacking/using entity/tool
         if (player.entityBeingBuilt == null) {
             const entityInHand = player.inventory[player.inventoryIndex];
             let entityInHandUseCooldown_ms = 300;
+            
             if (entityInHand instanceof Entity)
             {
-                entityInHand.position = player.position.copy();
-                entityInHand.rotation = player.rotation.add(3.14, 0, 0);
-                entityInHandUseCooldown_ms =  (entityInHand.asset.damage != null) ? entityInHand.asset.damage.cooldown_ms : 300;
-                const timeSinceLastItemUse_ms = Date.now() - player.entityInHand_lastUsedTimestamp_ms;
-                const percentCooldownCompleted = timeSinceLastItemUse_ms / entityInHandUseCooldown_ms;
-                if (percentCooldownCompleted < 1)
-                {
-                    entityInHand.rotation.y = -Math.sin(1-percentCooldownCompleted);
-                }
-            }
-            if (mouseIsDown && Date.now() - player.entityInHand_lastUsedTimestamp_ms > entityInHandUseCooldown_ms)
-            {
-                player.entityInHand_lastUsedTimestamp_ms = Date.now();
-                const damageObj = (entityInHand != null && entityInHand.damage != undefined) ? entityInHand.damage : {attackDamage:1, chopDamage:1, mineDamage:1, range:0.5, cooldown_ms:300};
-                
-                const vecFromPlayerToHitPos = new vec4(Math.cos(player.rotation.x), Math.sin(player.rotation.x)).scaleToUnit();
-                
-                // for (let dist=0.1; dist<damageObj.range; dist+=0.1)
-                // {
-                //     const pos = vecFromPlayerToHitPos.mul(dist).add(player.position);
-                //     for (let i in entitiesCloseToPlayer)
-                //     {
-                //         if (entitiesCloseToPlayer[i].getIsInsideBoundingCylinder(pos))
-                //         {
-                //             entityHit = entitiesCloseToPlayer[i];
-                //             break;
-                //         }
-                //     }
-                //     if (entityHit != null){break;}
-                // }
-                let entityHit = null;
-                let closestEntityDist = 10000;
-                for (let i in entitiesCloseToPlayer)
-                {
-                    const dist = entitiesCloseToPlayer[i].position.sub(player.position).getLength();
-                    if (dist < closestEntityDist && dist < damageObj.range + entitiesCloseToPlayer[i].asset.boundingCylinderRadius) { 
-                        entityHit = entitiesCloseToPlayer[i]; 
-                        closestEntityDist = dist;
+                if (entityInHand.asset.type == 'tool' || entityInHand.asset.type == 'weapon') {
+                    // Set object position and rotation, adjusting for cooldown if tool
+                    entityInHand.position = player.position.copy();
+                    entityInHand.rotation = player.rotation.add(3.14, 0, 0);
+                    entityInHandUseCooldown_ms =  (entityInHand.asset.damage != null) ? entityInHand.asset.damage.cooldown_ms : 300;
+                    const timeSinceLastItemUse_ms = Date.now() - player.entityInHand_lastUsedTimestamp_ms;
+                    const percentCooldownCompleted = timeSinceLastItemUse_ms / entityInHandUseCooldown_ms;
+                    if (percentCooldownCompleted < 1)
+                    {
+                        entityInHand.rotation.y = -Math.sin(1-percentCooldownCompleted);
+                    }
+                    
+                    // Check if we need to 'use' the tool
+                    if (mouseIsDown && Date.now() - player.entityInHand_lastUsedTimestamp_ms > entityInHandUseCooldown_ms)
+                    {
+                        player.entityInHand_lastUsedTimestamp_ms = Date.now();
+                        const damageObj = (entityInHand != null && entityInHand.damage != undefined) ? entityInHand.damage : {attackDamage:1, chopDamage:1, mineDamage:1, range:0.5, cooldown_ms:300};
+                        
+                        const vecFromPlayerToHitPos = new vec4(Math.cos(player.rotation.x), Math.sin(player.rotation.x)).scaleToUnit();
+                        
+                        // for (let dist=0.1; dist<damageObj.range; dist+=0.1)
+                        // {
+                        //     const pos = vecFromPlayerToHitPos.mul(dist).add(player.position);
+                        //     for (let i in entitiesCloseToPlayer)
+                        //     {
+                        //         if (entitiesCloseToPlayer[i].getIsInsideBoundingCylinder(pos))
+                        //         {
+                        //             entityHit = entitiesCloseToPlayer[i];
+                        //             break;
+                        //         }
+                        //     }
+                        //     if (entityHit != null){break;}
+                        // }
+                        let entityHit = null;
+                        let closestEntityDist = 10000;
+                        for (let i in entitiesCloseToPlayer)
+                        {
+                            const dist = entitiesCloseToPlayer[i].position.sub(player.position).getLength();
+                            if (dist < closestEntityDist && dist < damageObj.range + entitiesCloseToPlayer[i].asset.boundingCylinderRadius) { 
+                                entityHit = entitiesCloseToPlayer[i]; 
+                                closestEntityDist = dist;
+                            }
+                        }
+
+                        if (entityHit instanceof Entity && !entityHit.isCollectable)
+                        {
+                            const angle = Math.atan2(entityHit.position.y-player.position.y, entityHit.position.x-player.position.x);
+                            player.rotation.x = angle;
+
+                            const damageAmount = computeDamageAmount(entityHit, damageObj);
+                            outgoingCommands += cts_applyDamageToEntity(entityHit.id, damageAmount);
+                        }
+                    }
+                } else {
+                    const angle = player.rotation.x;
+                    entityInHand.position = player.position.add(Math.cos(angle), Math.sin(angle));
+                    entityInHand.rotation = player.rotation.add(1.57,);
+                    if (mouseWentDown)
+                    {
+                        // player.purchaseRecipe(entityInHand.asset.recipe);
+                        outgoingCommands += stc_instantiateEntity(entityInHand.asset.name, entityInHand.id, entityInHand.position, entityInHand.rotation);
+                        // Remove from inventory
+                        player.inventory[player.inventoryIndex] = null;
                     }
                 }
-
-                if (entityHit instanceof Entity && !entityHit.isCollectable)
-                {
-                    const angle = Math.atan2(entityHit.position.y-player.position.y, entityHit.position.x-player.position.x);
-                    player.rotation.x = angle;
-
-                    const damageAmount = computeDamageAmount(entityHit, damageObj);
-                    outgoingCommands += cts_applyDamageToEntity(entityHit.id, damageAmount);
-                }
-            }
-        }
-
-        // Update entityBeingBuilt
-        if (player.entityBeingBuilt != null)
-        {
-            const a = player.rotation.x;
-            console.log(player.rotation);
-            player.entityBeingBuilt.position = player.position.add(Math.cos(a), Math.sin(a));
-            player.entityBeingBuilt.rotation = player.rotation.add(1.57,);
-
-            if (mouseWentDown)
-            {
-                player.purchaseRecipe(player.entityBeingBuilt.asset.recipe);
-                outgoingCommands += stc_instantiateEntity(player.entityBeingBuilt.asset.name, player.entityBeingBuilt.id, player.entityBeingBuilt.position, player.entityBeingBuilt.rotation);
-                player.entityBeingBuilt = null;
             }
         }
     }
@@ -1120,7 +1150,11 @@ function update()
                 // Build entity
                 if (mouseWentDown && player.entityBeingBuilt == null && recipesThatCanBeCrafted.get(asset.name) == true)
                 {
-                    player.entityBeingBuilt = new Entity(asset, generateID(), player.position.copy(), player.rotation.copy());
+                    // Check if we can collect the entity. If we can, then purchase the recipe                    
+                    if (player.collectEntity(asset.name))
+                    {
+                        player.purchaseRecipe(asset.recipe);
+                    }
                 }
             }
 
@@ -1132,6 +1166,7 @@ function update()
     }
 
     mouseWentDown = false;
+    mouseWheelChange = 0;
     // console.log(entities.length);
 }
 
@@ -1294,10 +1329,8 @@ ws.addEventListener('message', (event) => {
                 {
                     continue;
                 }
-                e = new Entity(asset, data.entityID, data.position, data.rotation);
+                e = new Entity(asset, data.entityID, data.position, data.rotation, data.isCollectable);
                 e.health = data.health;
-                e.isCollectable = data.isCollectable;
-                if (e.isCollectable) { console.log("collectable",e.asset.name);}
                 entitiesMap.set(e.id, e);
                 entities.push(e);
                 console.log("creating new entity")
@@ -1314,8 +1347,7 @@ ws.addEventListener('message', (event) => {
                 console.error("Failed to instantiate asset (from command) with assetName:",data.assetName);
                 continue;
             }
-            const e = new Entity(asset, data.entityID, data.position, data.rotation);
-            e.isCollectable = data.isCollectable;
+            const e = new Entity(asset, data.entityID, data.position, data.rotation, data.isCollectable);
             entitiesMap.set(e.id, e);
             entities.push(e);
             continue;

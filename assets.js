@@ -18114,7 +18114,7 @@ for (let i=0; i<assets.length; i++)
 
 class Entity
 {
-    constructor(asset = new Asset(), id = "", position=new vec4(), rotation = new vec4())
+    constructor(asset = new Asset(), id = "", position=new vec4(), rotation = new vec4(), isCollectable=null)
     {
         this.asset          = asset;
         this.id             = id;
@@ -18128,6 +18128,8 @@ class Entity
         this.isCollectable      = asset.isCollectable;
         this.isCollectableRandomBounceOffset = Math.random()*6.28;
         this.tookDamageTimestamp_ms = 0;
+
+        if (isCollectable != null) { this.isCollectable = isCollectable; }
 
         this.instantiationTime_ms = Date.now();
     }
@@ -18551,14 +18553,6 @@ function generate_world(width=50)
                 else if (firTreeNoise < 0.80) { asset = asset_firTree2; } 
                 else if (firTreeNoise < 0.90) { asset = asset_firTree3; }
                 entities.push(new Entity(asset, generateID(), new vec4(x,y,0,0).add(offset), new vec4(angle,0,0)));
-                // entities.push(
-                //     {
-                //         name: name,
-                //         position: new vec4(x,y,0,0).add(offset),
-                //         rotation: new vec4(angle,0,0),
-                //         health: asset_firTree1.health.amount,
-                //     }
-                // )
                 continue;
             }
             if (mapleTreeNoise > 0.60) // add maple tree
@@ -18568,14 +18562,6 @@ function generate_world(width=50)
                 else if (mapleTreeNoise < 0.80) { asset = asset_mapleTree2; } 
                 else if (mapleTreeNoise < 0.90) { asset = asset_mapleTree3; }
                 entities.push(new Entity(asset, generateID(), new vec4(x,y,0,0).add(offset), new vec4(angle,0,0)));
-                // entities.push(
-                //     {
-                //         name: name,
-                //         position: new vec4(x,y,0,0).add(offset),
-                //         rotation: new vec4(),
-                //         health: asset_firTree1.health.amount,
-                //     }
-                // )
                 continue;
             }
             if (stoneNoise > 0.60) // add maple tree
@@ -18880,7 +18866,7 @@ if (typeof window == "undefined")
                         const count = entity.asset.drop[i].count;
                         for (let j=0; j<count; j++)
                         {
-                            const e = new Entity(assetMap.get(assetName), generateID(), position=entity.position.add(0.5-Math.random(), 0.5-Math.random()), rotation=entity.rotation.add(0.5-Math.random(), 0.5-Math.random()));
+                            const e = new Entity(assetMap.get(assetName), generateID(), position=entity.position.add(0.5-Math.random(), 0.5-Math.random()), rotation=entity.rotation.add(0.5-Math.random(), 0.5-Math.random()), true);
                             e.isCollectable = true;
                             output += stc_instantiateEntity(assetName, e.id, e.position, e.rotation, e.isCollectable);
                             entities.push(e);
@@ -18955,16 +18941,16 @@ if (typeof window == "undefined")
             }
             if (command.startsWith("stc_instantiateEntity"))
             {
-                const data = parse_stc_instantiateEntity(message);
+                const data = parse_stc_instantiateEntity(command);
                 const asset = assetMap.get(data.assetName);
                 if (asset == undefined) { 
-                    console.error("server received stc_instantiateEntity, and could not find asset with name:",data.assetName); 
+                    console.error("server received stc_instantiateEntity, and could not find asset with name:",data.assetName,data,"\n\ncommand:",command,"\n\nmessage:",message); 
                     continue;
                 }
-                const e = new Entity(asset, data.entityID, data.position, data.rotation);
+                const e = new Entity(asset, data.entityID, data.position, data.rotation, data.isCollectable);
                 entities.push(e);
                 entitiesMap.set(e.id, e);
-                output += stc_instantiateEntity(e.asset.name, e.id, e.position, e.rotation);
+                output += stc_instantiateEntity(e.asset.name, e.id, e.position, e.rotation, e.isCollectable);
                 continue;
             }
             if (command == "" || command == " ")
