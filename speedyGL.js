@@ -161,18 +161,17 @@ class SpeedyGL
         uniform highp vec4 uLightDirectionVector;
         uniform vec4 uCameraPositionVector;
         uniform float uObjectReflectivity;
+        uniform float uObjectColorMultiplier;
 
         void main() {
-            // gl_FragColor = color;
-            // return;
 
             vec3 ray = reflect( normalize(pos.xyz - uCameraPositionVector.xyz), surfaceNormal);
             float d = dot(uLightDirectionVector.xyz, ray);
             if (d < 0.0) { 
-                gl_FragColor = color;
+                gl_FragColor = color * uObjectColorMultiplier;
             } else { 
                 d = (d*d*d*d)*uObjectReflectivity; 
-                gl_FragColor = color + d*vec4(0.9,0.9,0.9,0.9);
+                gl_FragColor = color * uObjectColorMultiplier + d*vec4(0.9,0.9,0.9,0.9);
             }
         }
         `;
@@ -212,6 +211,7 @@ class SpeedyGL
                 // objectScaleVector: this.gl.getUniformLocation(shaderProgram, 'uObjectScaleVector'),
 
                 objectReflectivity: this.gl.getUniformLocation(shaderProgram, 'uObjectReflectivity'),
+                objectColorMultiplier: this.gl.getUniformLocation(shaderProgram, 'uObjectColorMultiplier'),
             },
         };
 
@@ -494,7 +494,7 @@ class SpeedyGL
                     rotation: new vec4(),
                     scale: new vec4(),
                     reflectivity: 0,
-                    colorMultiplier: new vec4(1,1,1,1)
+                    colorMultiplier: 1
                 }
             ]
         ]
@@ -562,6 +562,7 @@ class SpeedyGL
                 const instanceData = objectInstances[j];
                 const reflectivity = (instanceData.reflectivity == null)? 0 : instanceData.reflectivity;
                 const scale = (instanceData.scale == null) ? new vec4(1,1,1,1) : instanceData.scale;
+                const colorMultiplier = (instanceData.colorMultiplier == null) ? 1 : instanceData.colorMultiplier
 
                 const rotMat = new mat4().makeRotation(instanceData.rotation);
                 const mat = new mat4().makeTranslationRotationScale(instanceData.position, instanceData.rotation, scale);
@@ -570,6 +571,7 @@ class SpeedyGL
                 this.gl.uniformMatrix4fv(this.programInfo.uniformLocations.objectMatrix,       false,       mat.getFloat32Array());
 
                 this.gl.uniform1f(this.programInfo.uniformLocations.objectReflectivity,         reflectivity);
+                this.gl.uniform1f(this.programInfo.uniformLocations.objectColorMultiplier,      colorMultiplier);
                 this.gl.drawElements(this.gl.TRIANGLES, objectData.indices.length, this.gl.UNSIGNED_SHORT, 0);
             }
         }

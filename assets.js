@@ -18135,6 +18135,9 @@ class Entity
         if (isCollectable != null) { this.isCollectable = isCollectable; }
 
         this.instantiationTime_ms = Date.now();
+
+        this.client_lastUpdateTimestamp_ms = Date.now();
+        this.client_cannotCurrentlyBePlaced = false;
     }
     getString()
     {
@@ -18948,6 +18951,17 @@ if (typeof window == "undefined")
                 output += stc_instantiateEntity(e.asset.name, e.id, e.position, e.rotation, e.isCollectable);
                 continue;
             }
+            if (command.startsWith("cts_getAllAgents"))
+            {
+                for (let i=0; i<entities.length; i++)
+                {
+                    if (entities[i] instanceof AgentEntity)
+                    {
+                        player.server_commandsQueue += stc_entityData(entities[i]);
+                    }
+                }
+                continue;
+            }
             if (command == "" || command == " ")
             {
                 continue;
@@ -18961,7 +18975,6 @@ if (typeof window == "undefined")
             p.server_commandsQueue += output;
         }
     }
-    
     
     const WebSocket = require('ws');
     const wss = new WebSocket.Server({ port: 8080 });
@@ -19094,8 +19107,11 @@ if (typeof window == "undefined")
             p.server_commandsQueue += outgoingCommands;
         }
 
-        // const e = new AgentEntity(asset_firTree1, generateID(), new vec4(5-Math.random()*10, 5-Math.random()*10), new vec4());
-        // entitiesMap.set(e.id, e);
-        // entities.push(e);
+        if (Math.random() < 0.1)
+        {
+            const e = new AgentEntity(asset_firTree1, generateID(), new vec4(5-Math.random()*10, 5-Math.random()*10), new vec4());
+        entitiesMap.set(e.id, e);
+        entities.push(e);
+        }
     }
 }
